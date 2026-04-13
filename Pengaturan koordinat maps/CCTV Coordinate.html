@@ -1,0 +1,173 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.wrap { position: relative; width: 100%; padding: 1rem 0; }
+.img-wrap { position: relative; width: 100%; display: inline-block; }
+.img-wrap img { width: 100%; display: block; }
+.grid-overlay { position: absolute; inset: 0; pointer-events: none; }
+.vline { position: absolute; width: 1px; top: 0; bottom: 0; background: rgba(0,120,255,0.2); }
+.hline { position: absolute; height: 1px; left: 0; right: 0; background: rgba(0,120,255,0.2); }
+.xlabel {
+  position: absolute; top: 2px;
+  font-size: 10px; color: rgba(0,80,220,0.9);
+  transform: translateX(-50%); font-weight: 700;
+  background: rgba(255,255,255,0.75); padding: 0 2px; border-radius: 2px;
+}
+.ylabel {
+  position: absolute; left: 2px;
+  font-size: 10px; color: rgba(0,80,220,0.9);
+  transform: translateY(-50%); font-weight: 700;
+  background: rgba(255,255,255,0.75); padding: 0 2px; border-radius: 2px;
+}
+.crosshair {
+  position: absolute; width: 12px; height: 12px;
+  background: rgba(226,75,74,0.9); border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none; z-index: 20; display: none;
+  border: 2px solid white;
+}
+.crosshair-h {
+  position: absolute; height: 1px; background: rgba(226,75,74,0.4);
+  left: 0; right: 0; pointer-events: none; z-index: 15; display: none;
+}
+.crosshair-v {
+  position: absolute; width: 1px; background: rgba(226,75,74,0.4);
+  top: 0; bottom: 0; pointer-events: none; z-index: 15; display: none;
+}
+.coord-display {
+  position: absolute;
+  background: rgba(20,20,20,0.85); color: white;
+  font-size: 12px; font-weight: 700;
+  padding: 4px 10px; border-radius: 5px;
+  pointer-events: none; z-index: 30; display: none;
+  white-space: nowrap; font-family: monospace;
+}
+.pinned-list {
+  margin-top: 10px;
+  font-size: 12px; font-family: monospace;
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: 8px; padding: 10px 14px;
+  color: var(--color-text-primary);
+  min-height: 36px;
+}
+.pinned-list span { color: var(--color-text-secondary); }
+.pin-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.pin-row:last-child { border-bottom: none; }
+.pin-dot { width: 8px; height: 8px; background: #E24B4A; border-radius: 50%; flex-shrink: 0; }
+.del-btn { background: none; border: none; color: #aaa; cursor: pointer; font-size: 13px; padding: 0 2px; }
+.del-btn:hover { color: #E24B4A; }
+.hint { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 6px; font-family: sans-serif; }
+</style>
+
+<div class="wrap">
+  <p class="hint">Hover = lihat koordinat · Klik = pin titik · Klik pin untuk hapus</p>
+  <div class="img-wrap" id="img-wrap">
+    <img src="dt-l1.png" id="fp" alt="KOI Lantai 1" draggable="false"/>
+    <div class="grid-overlay" id="grid-overlay"></div>
+    <div class="crosshair-h" id="ch-h"></div>
+    <div class="crosshair-v" id="ch-v"></div>
+    <div class="crosshair"   id="crosshair"></div>
+    <div class="coord-display" id="coord-display"></div>
+  </div>
+  <div class="pinned-list" id="pinned-list"><span>Klik pada gambar untuk pin koordinat kamera...</span></div>
+</div>
+
+<script>
+const overlay   = document.getElementById('grid-overlay');
+const wrap      = document.getElementById('img-wrap');
+const crosshair = document.getElementById('crosshair');
+const chH       = document.getElementById('ch-h');
+const chV       = document.getElementById('ch-v');
+const coordDisp = document.getElementById('coord-display');
+const pinnedList= document.getElementById('pinned-list');
+let pins = [];
+
+function buildGrid() {
+  overlay.innerHTML = '';
+  for (let i = 10; i < 100; i += 10) {
+    const vl = document.createElement('div');
+    vl.className = 'vline'; vl.style.left = i + '%';
+    const xl = document.createElement('div');
+    xl.className = 'xlabel'; xl.style.left = i + '%'; xl.textContent = i;
+    overlay.appendChild(vl); overlay.appendChild(xl);
+
+    const hl = document.createElement('div');
+    hl.className = 'hline'; hl.style.top = i + '%';
+    const yl = document.createElement('div');
+    yl.className = 'ylabel'; yl.style.top = i + '%'; yl.textContent = i;
+    overlay.appendChild(hl); overlay.appendChild(yl);
+  }
+}
+
+wrap.addEventListener('mousemove', e => {
+  const rect = wrap.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  const x = Math.round(px / rect.width  * 100);
+  const y = Math.round(py / rect.height * 100);
+
+  crosshair.style.left = px + 'px';
+  crosshair.style.top  = py + 'px';
+  crosshair.style.display = 'block';
+
+  chH.style.top = py + 'px'; chH.style.display = 'block';
+  chV.style.left = px + 'px'; chV.style.display = 'block';
+
+  let cx = px + 14, cy = py - 30;
+  if (cx + 100 > rect.width) cx = px - 110;
+  if (cy < 0) cy = py + 10;
+  coordDisp.style.left = cx + 'px';
+  coordDisp.style.top  = cy + 'px';
+  coordDisp.textContent = `x:${x}  y:${y}`;
+  coordDisp.style.display = 'block';
+});
+
+wrap.addEventListener('mouseleave', () => {
+  crosshair.style.display = 'none';
+  chH.style.display = 'none';
+  chV.style.display = 'none';
+  coordDisp.style.display = 'none';
+});
+
+wrap.addEventListener('click', e => {
+  const rect = wrap.getBoundingClientRect();
+  const x = Math.round((e.clientX - rect.left) / rect.width  * 100);
+  const y = Math.round((e.clientY - rect.top)  / rect.height * 100);
+  const id = Date.now();
+  pins.push({ id, x, y });
+
+  const dot = document.createElement('div');
+  dot.style.cssText = `position:absolute;width:10px;height:10px;background:#E24B4A;border:2px solid white;border-radius:50%;transform:translate(-50%,-50%);z-index:25;pointer-events:none;`;
+  dot.style.left = x + '%';
+  dot.style.top  = y + '%';
+  dot.dataset.id = id;
+  wrap.appendChild(dot);
+
+  renderPins();
+});
+
+function renderPins() {
+  if (pins.length === 0) {
+    pinnedList.innerHTML = '<span>Klik pada gambar untuk pin koordinat kamera...</span>';
+    return;
+  }
+  pinnedList.innerHTML = pins.map(p =>
+    `<div class="pin-row">
+      <span class="pin-dot"></span>
+      <span style="flex:1">x: <b>${p.x}</b> &nbsp; y: <b>${p.y}</b></span>
+      <code style="font-size:11px;color:#666">{ x:${p.x}, y:${p.y} }</code>
+      <button class="del-btn" onclick="removePin(${p.id})">✕</button>
+    </div>`
+  ).join('');
+}
+
+function removePin(id) {
+  pins = pins.filter(p => p.id !== id);
+  const dot = wrap.querySelector(`[data-id="${id}"]`);
+  if (dot) dot.remove();
+  renderPins();
+}
+
+buildGrid();
+</script>

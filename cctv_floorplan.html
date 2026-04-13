@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CCTV Floor Plan Viewer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: sans-serif;
+    background: #f0efea;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Topbar ── */
+  .topbar {
+    background: #1a1a2e;
+    color: white;
+    padding: 0 20px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .topbar-title { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+  .topbar-sub   { font-size: 12px; color: rgba(255,255,255,0.4); margin-left: 10px; }
+  .topbar-right { font-size: 12px; color: rgba(255,255,255,0.4); }
+
+  /* ── Layout ── */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 175px;
+    background: #12122a;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding-bottom: 16px;
+  }
+  .sidebar-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    color: rgba(255,255,255,0.25);
+    padding: 16px 14px 8px;
+  }
+  .building-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 14px; cursor: pointer;
+    transition: background 0.15s; user-select: none;
+  }
+  .building-row:hover { background: rgba(255,255,255,0.05); }
+  .building-row.open  { background: rgba(255,255,255,0.04); }
+  .building-name { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.9); letter-spacing: 0.3px; }
+  .chevron { width: 14px; height: 14px; flex-shrink: 0; transition: transform 0.2s; }
+  .building-row.open .chevron { transform: rotate(90deg); }
+  .floor-list { overflow: hidden; max-height: 0; transition: max-height 0.25s ease; }
+  .floor-list.open { max-height: 500px; }
+  .floor-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 14px 7px 24px; cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .floor-btn:hover { background: rgba(255,255,255,0.06); }
+  .floor-btn.active { background: rgba(226,75,74,0.15); border-left-color: #E24B4A; }
+  .floor-name { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.7); }
+  .floor-btn.active .floor-name { color: white; font-weight: 600; }
+  .floor-cam-pill {
+    font-size: 10px; color: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.07);
+    padding: 1px 6px; border-radius: 10px;
+  }
+  .floor-btn.active .floor-cam-pill { background: rgba(226,75,74,0.3); color: rgba(255,180,180,0.9); }
+
+  /* ── Content ── */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .floor-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .floor-header-left { display: flex; align-items: center; gap: 10px; }
+  .floor-title { font-size: 16px; font-weight: 700; color: #1a1a1a; }
+  .cam-badge {
+    background: #E24B4A; color: white;
+    font-size: 11px; font-weight: 600;
+    padding: 2px 9px; border-radius: 20px;
+  }
+
+  /* Zoom controls */
+  .zoom-controls {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .zoom-btn {
+    width: 30px; height: 30px;
+    background: white; border: 1px solid #ddd;
+    border-radius: 6px; cursor: pointer;
+    font-size: 18px; font-weight: 400;
+    display: flex; align-items: center; justify-content: center;
+    color: #333; transition: background 0.1s;
+    line-height: 1;
+  }
+  .zoom-btn:hover { background: #f5f5f5; }
+  .zoom-btn:active { transform: scale(0.95); }
+  .zoom-label {
+    font-size: 12px; color: #888; min-width: 38px; text-align: center;
+  }
+  .zoom-reset {
+    font-size: 11px; color: #888; cursor: pointer;
+    background: white; border: 1px solid #ddd;
+    border-radius: 6px; padding: 0 10px; height: 30px;
+    transition: background 0.1s;
+  }
+  .zoom-reset:hover { background: #f5f5f5; color: #333; }
+
+  /* ── Scrollable map viewport ── */
+  .map-viewport {
+    flex: 1;
+    overflow: auto;
+    background: #e8e7e2;
+    border-radius: 10px;
+    border: 1px solid #d8d7d2;
+    cursor: grab;
+    position: relative;
+  }
+  .map-viewport:active { cursor: grabbing; }
+  .map-viewport.no-drag { cursor: default; }
+
+  /* The inner container scales with zoom */
+  .map-inner {
+    position: relative;
+    display: inline-block;
+    transform-origin: top left;
+    /* width/height set via JS */
+  }
+  .map-inner img.fp {
+    display: block;
+    /* actual size set via JS */
+  }
+
+  .cam-marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+  }
+  .cam-btn {
+    display: flex; align-items: center; gap: 4px;
+    background: #E24B4A; color: white;
+    border: none; border-radius: 4px;
+    padding: 3px 8px; font-size: 11px; font-weight: 700;
+    cursor: pointer; white-space: nowrap;
+    transition: background 0.15s, transform 0.1s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .cam-btn:hover { background: #A32D2D; transform: scale(1.07); }
+  .cam-btn:active { transform: scale(0.97); }
+  
+  /* ── Empty state ── */
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; color: #aaa; background: #e8e7e2;
+    border-radius: 10px; border: 1px solid #d8d7d2;
+  }
+  .empty-state svg { opacity: 0.25; }
+  .empty-state p { font-size: 14px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6); z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: white; border-radius: 12px;
+    width: 420px; max-width: 94vw;
+    overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .modal-photo {
+    width: 100%; height: 240px; background: #111;
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-photo img.snap { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .no-photo {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 8px; opacity: 0.35;
+  }
+  .no-photo svg { width: 60px; height: 45px; }
+  .no-photo span { color: white; font-size: 12px; }
+  .cam-label-badge {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(0,0,0,0.55); color: white;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 4px;
+  }
+  .modal-body { padding: 1rem 1.25rem; }
+  .modal-ip { font-size: 16px; font-weight: 700; color: #1a1a1a; margin-bottom: 10px; }
+  .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; font-size: 13px; }
+  .info-label { color: #888; }
+  .info-val   { color: #1a1a1a; font-weight: 500; }
+  .modal-footer {
+    padding: 10px 1.25rem; border-top: 1px solid #eee;
+    display: flex; justify-content: flex-end;
+  }
+  .close-btn {
+    background: transparent; border: 1px solid #ddd;
+    border-radius: 6px; padding: 7px 18px;
+    font-size: 13px; cursor: pointer; color: #444;
+  }
+  .close-btn:hover { background: #f5f5f5; }
+
+  .lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.lightbox.open { display: flex; }
+.lightbox img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.lightbox.open { display: flex; }
+.lightbox img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <span class="topbar-title">CCTV Monitor</span>
+    <span class="topbar-sub">Floor Plan View</span>
+  </div>
+  <div class="topbar-right" id="topbar-info"></div>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-label">GEDUNG</div>
+    <div id="building-list"></div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect x="4" y="10" width="28" height="22" rx="3" fill="#888"/>
+        <polygon points="32,13 44,6 44,38 32,31" fill="#888"/>
+        <circle cx="16" cy="21" r="6" fill="#f0efea"/>
+      </svg>
+      <p>Pilih gedung dan lantai di sidebar</p>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-photo" id="modal-photo"></div>
+    <div class="modal-body">
+      <div class="modal-ip" id="modal-ip">-</div>
+      <div class="info-grid">
+        <span class="info-label">Gedung</span>
+        <span class="info-val" id="modal-building">-</span>
+        <span class="info-label">Lantai</span>
+        <span class="info-val" id="modal-floor">-</span>
+        <span class="info-label">Ruangan</span>
+        <span class="info-val" id="modal-room">-</span>
+        <span class="info-label">Tipe</span>
+        <span class="info-val" id="modal-type">-</span>
+        <span class="info-label">Status</span>
+        <span class="info-val" style="color:#1D9E75">● Online</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="close-btn" id="close-btn">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const buildings = [
+  {
+    id: 'gedung-arts', name: "Arts",
+    floors: [
+      {
+        id: 'arts-lt1', name: 'Lantai 1',
+        floorplan: 'ac-l1.png',
+        cameras: [
+          { ip:'192.168.12.1', x:41, y:89, room:'AC-119', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.2', x:83, y:55, room:'AC-1 Stair', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.3', x:44, y:49, room:'AC-1 Toilet', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.4', x:7, y:89, room:'AC-120', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.5', x:90, y:55, room:'AC-1 Shop', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.6', x:46, y:45, room:'AC-1 Gallery', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.7', x:58, y:65, room:'AC-1 Dance', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.8', x:20, y:15, room:'AC-1 Nurse', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.9', x:53, y:89, room:'AC-1 Drama', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.10', x:72, y:19, room:'AC-1 Lotus Lounge', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.11', x:40, y:44, room:'AC-1 TD Ctrl', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.12', x:12, y:60, room:'AC-1 TD South', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.13', x:12, y:26, room:'AC-1 TD North', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.14', x:80, y:35, room:'AC-1 Entrance', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.15', x:80, y:75, room:'AC-1 Bamboo C', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.16', x:19, y:18, room:'AC-1 Hallway', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.17', x:65, y:26, room:'AC-1 to ZH', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.18', x:94, y:20, room:'AC-1 Front A', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.19', x:94, y:82, room:'AC-1 Front B', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.20', x:65, y:99, room:'AC-1 to Koi', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.21', x:6, y:4, room:'AC-1 ZHGarden', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.33', x:26, y:69, room:'AC-118', type:'Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.34', x:45, y:40, room:'AC-1 ATM', type:'Indoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.35', x:39, y:19, room:'AC-117', type:'Indoor', photo:'test.jpeg'},
+          { ip:'192.168.12.36', x:7, y:19, room:'AC-110-02', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.37', x:7, y:71, room:'AC-110-01', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.38', x:30, y:69, room:'AC-118', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.49', x:63, y:89, room:'AC-1 Bamboo C 2', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+          { ip:'192.168.12.50', x:83, y:72, room:'AC-1 Bamboo Kitchen', type:'Outdoor', photo:'foto/cam_19_10.jpg '},
+        ]
+      },
+      {
+        id: 'arts-lt2', name: 'Lantai 2',
+        floorplan: 'ac-l2.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+    ]
+  },
+
+  {
+    id: 'basement', name:'Basement',
+    floors: [
+      {
+        id: 'arts-basement', name: 'Basement',
+        floorplan: 'basement.png',
+        cameras: [
+          { ip:'192.168.1.1', x:664, y:12, room:'', loc:'',  type:'Indoor', photo:''}
+        ]
+      }
+    ]
+
+  },
+
+  /*Davinci*/
+
+  {
+    id: 'gedung-dt', name: "Davinci",
+    floors: [
+      {
+        id: 'dt-lt1', name: 'Lantai 1',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg'}
+        ]
+      },
+      {
+        id: 'dt-lt2', name: 'Lantai 2',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'dt-lt3', name: 'Lantai 3',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'dt-lt4', name: 'Lantai 4',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'dt-lt5', name: 'Lantai 5',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'dt-lt6', name: 'Lantai 6',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+    ]
+  },
+
+  /*ES GYM*/
+
+  {
+    id: 'es-gym', name: "ES Gym",
+    floors: [
+      {
+        id: 'eg-lt1', name: 'Lantai 1',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'eg-lt2', name: 'Lantai 2',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+    ]
+  },
+
+/*Gajah Mada*/
+
+  {
+    id: 'gedung-gm', name: "Gajah Mada",
+    floors: [
+      {
+        id: 'gm-lt1', name: 'Lantai 1',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'gm-lt2', name: 'Lantai 2',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'gm-lt3', name: 'Lantai 3',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      }
+    ]
+  },
+
+  /*KOI*/
+
+  {
+    id: 'koi', name: 'Koi',
+    floors: [
+      {
+        id: 'koi-lt1', name: 'Lantai 1',
+        floorplan: 'Koi 1st floor.png',
+        cameras: [
+          { ip:'192.168.18.1',  x:72,   y:48,  room:'KOI-111',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'test.jpeg'  },
+          { ip:'192.168.18.2',  x:64,   y:93,  room:'KOI-112',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.3',  x:20,   y:17,  room:'KOI-101',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.4',  x:10,   y:88,  room:'KOI-107',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.5',  x:26,   y:71,  room:'KOI-1 Piazza',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.6',  x:15,   y:43,  room:'KOI-108',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.7',  x:49,   y:15,  room:'KOI-102',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.8',  x:49,   y:32,  room:'KOI-103',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.9',  x:21,   y:93,  room:'KOI-106',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.10',  x:52,   y:80,  room:'KOI-1 Lobby',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.11',  x:53,   y:39,  room:'KOI-1 Entrance',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.12',  x:88,   y:94,  room:'KOI-1 Basket',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.12',  x:45,   y:69,  room:'KOI-1 Toilet',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+          { ip:'192.168.18.12',  x:26,   y:34,  room:'KOI-1 Panel',   loc:'Pojok kiri',            type:'Dome Indoor',  photo:'foto/cam_18_1.jpg'  },
+        ]
+      },
+      {
+        id: 'koi-lt2', name: 'Lantai 2',
+        floorplan: 'Koi 2nd floor.png',
+        cameras: [
+          { ip:'192.168.18.40', x:63, y:73, room:'2110', loc:'KOI-2 Stair',  type:'Dome Indoor', photo:'foto/cam_18_40.jpg' },
+          { ip:'192.168.18.41', x:51, y:9, room:'2120', loc:'KOI-202',    type:'Bullet',      photo:'foto/cam_18_41.jpg' },
+          { ip:'192.168.18.42', x:27, y:67, room:'2130', loc:'KOI-2 Piazza',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:21, y:12, room:'2130', loc:'KOI-201',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:16, y:39, room:'2130', loc:'KOI-208',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:22, y:90, room:'2130', loc:'KOI-206',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:51, y:27, room:'2130', loc:'COUNSELLOR ROOM',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:10, y:85, room:'2130', loc:'KOI-207',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:47, y:66, room:'2130', loc:'KOI-2 Toilet',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+        ]
+      },
+      {
+        id: 'koi-lt3', name: 'Lantai 3',
+        floorplan: 'Koi 3rd floor.png',
+        cameras: [
+          { ip:'192.168.18.42', x:60, y:73, room:'2130', loc:'KOI-3 Stair',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:48, y:27, room:'2130', loc:'KOI-303',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:48, y:9, room:'2130', loc:'KOI-302',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:19, y:12, room:'2130', loc:'KOI-301',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:25, y:66, room:'2130', loc:'KOI-3 Piazza',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:9, y:85, room:'2130', loc:'KOI-307',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:19, y:30, room:'2130', loc:'KOI-309',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:14, y:39, room:'2130', loc:'KOI-308',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:20, y:89, room:'2130', loc:'KOI-306',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+          { ip:'192.168.18.42', x:44, y:65, room:'2130', loc:'KOI-3 Toilet',   type:'Dome Indoor', photo:'foto/cam_18_42.jpg' },
+        ]
+      },
+    ]
+  },
+  
+  /*Layang-layang*/
+
+  {
+    id: 'gedung-ly', name: "Layang",
+    floors: [
+      {
+        id: 'ly-lt1', name: 'Lantai 1',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'ly-lt2', name: 'Lantai 2',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+    ]
+  },
+
+  /*Sport Center*/
+
+  {
+    id: 'gedung-sc', name: "Sport Center",
+    floors: [
+      {
+        id: 'sc-lt1', name: 'Lantai 1',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'sc-lt2', name: 'Lantai 2',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+    ]
+  },
+
+  /*Topeng*/
+
+  {
+    id: 'gedung-tp', name: "Topeng",
+    floors: [
+      {
+        id: 'tp-lt1', name: 'Lantai 1',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'tp-lt2', name: 'Lantai 2',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'tp-lt3', name: 'Lantai 3',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      }
+    ]
+  },
+
+  /*Wayang*/
+
+  {
+    id: 'gedung-wy', name: 'Wayang',
+    floors: [
+      {
+        id: 'wy-lt1', name: 'Lantai 1',
+        floorplan: 'floorplan_gb_lt1.png',
+        cameras: [
+          { ip:'192.168.19.1', x:20, y:25, room:'A101', loc:'Lobby utama',   type:'Dome Indoor', photo:'foto/cam_19_1.jpg' },
+          { ip:'192.168.19.2', x:75, y:40, room:'A102', loc:'Koridor timur', type:'Bullet',      photo:'foto/cam_19_2.jpg' },
+        ]
+      },
+      {
+        id: 'wy-lt2', name: 'Lantai 2',
+        floorplan: 'floorplan_gb_lt2.png',
+        cameras: [
+          { ip:'192.168.19.10', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg' },
+          { ip:'192.168.19.11', x:65, y:60, room:'B202', loc:'Pantry',      type:'Dome Indoor', photo:'foto/cam_19_11.jpg' },
+        ]
+      },
+    ]
+  },
+
+  /*Zheng He*/
+
+  {
+    id: 'gedung-zh', name: "Zheng He",
+    floors: [
+      {
+        id: 'zh-lt1', name: 'Lantai 1',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'zh-lt2', name: 'Lantai 2',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      },
+      {
+        id: 'zh-lt3', name: 'Lantai 3',
+        floorplan: 'Arts 1st floor.png',
+        cameras: [
+          { ip:'192.168.12.1', x:64, y:72, room:'B201', loc:'Ruang rapat', type:'Dome Indoor', photo:'foto/cam_19_10.jpg '}
+        ]
+      }
+    ]
+  }
+];
+
+let activeBuilding = null;
+let activeFloor    = null;
+let zoomLevel      = 1;
+const ZOOM_STEP    = 0.2;
+const ZOOM_MIN     = 0.5;
+const ZOOM_MAX     = 3;
+
+const overlay = document.getElementById('modal-overlay');
+
+function noPhotoHTML() {
+  return `<div class="no-photo">
+    <svg viewBox="0 0 64 48" fill="none">
+      <rect x="2" y="10" width="36" height="28" rx="4" fill="white"/>
+      <polygon points="38,14 62,4 62,44 38,34" fill="white"/>
+      <circle cx="18" cy="24" r="8" fill="#111"/>
+      <circle cx="18" cy="24" r="4" fill="#444"/>
+    </svg>
+    <span>Foto tidak tersedia</span>
+  </div>`;
+}
+
+function totalCams() {
+  return buildings.reduce((s,b) => s + b.floors.reduce((ss,f) => ss + f.cameras.length, 0), 0);
+}
+
+function buildSidebar() {
+  const list = document.getElementById('building-list');
+  list.innerHTML = '';
+  buildings.forEach(building => {
+    const isOpenB = activeBuilding && activeBuilding.id === building.id;
+    const row = document.createElement('div');
+    row.className = 'building-row' + (isOpenB ? ' open' : '');
+    row.innerHTML = `<span class="building-name">${building.name}</span>
+      <svg class="chevron" viewBox="0 0 14 14" fill="none">
+        <path d="M5 3l4 4-4 4" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+    row.addEventListener('click', () => toggleBuilding(building));
+    list.appendChild(row);
+
+    const floorList = document.createElement('div');
+    floorList.className = 'floor-list' + (isOpenB ? ' open' : '');
+    building.floors.forEach(floor => {
+      const isActive = activeFloor && activeFloor.id === floor.id;
+      const btn = document.createElement('div');
+      btn.className = 'floor-btn' + (isActive ? ' active' : '');
+      btn.innerHTML = `<span class="floor-name">${floor.name}</span>
+        <span class="floor-cam-pill">${floor.cameras.length}</span>`;
+      btn.addEventListener('click', e => { e.stopPropagation(); selectFloor(building, floor); });
+      floorList.appendChild(btn);
+    });
+    list.appendChild(floorList);
+  });
+  document.getElementById('topbar-info').textContent = totalCams() + ' kamera aktif';
+}
+
+function toggleBuilding(building) {
+  if (activeBuilding && activeBuilding.id === building.id) {
+    activeBuilding = null; activeFloor = null;
+    buildSidebar(); showEmpty();
+  } else {
+    activeBuilding = building; activeFloor = null;
+    buildSidebar(); showEmpty();
+  }
+}
+
+function selectFloor(building, floor) {
+  activeBuilding = building; activeFloor = floor;
+  zoomLevel = 0.47;
+  buildSidebar(); renderFloor();
+}
+
+function showEmpty() {
+  document.getElementById('content').innerHTML = `
+    <div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect x="4" y="10" width="28" height="22" rx="3" fill="#888"/>
+        <polygon points="32,13 44,6 44,38 32,31" fill="#888"/>
+        <circle cx="16" cy="21" r="6" fill="#f0efea"/>
+      </svg>
+      <p>Pilih lantai di sidebar</p>
+    </div>`;
+}
+
+function renderFloor() {
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="floor-header">
+      <div class="floor-header-left">
+        <span class="floor-title">${activeBuilding.name} — ${activeFloor.name}</span>
+        <span class="cam-badge">${activeFloor.cameras.length} kamera</span>
+      </div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" id="btn-zoom-out">−</button>
+        <span class="zoom-label" id="zoom-label">100%</span>
+        <button class="zoom-btn" id="btn-zoom-in">+</button>
+        <button class="zoom-reset" id="btn-zoom-reset">Reset</button>
+      </div>
+    </div>
+    <div class="map-viewport" id="map-viewport">
+      <div class="map-inner" id="map-inner">
+        <img class="fp" id="fp-img" src="${activeFloor.floorplan}" alt="Denah ${activeFloor.name}" draggable="false" />
+      </div>
+    </div>`;
+
+  document.getElementById('btn-zoom-in').addEventListener('click', () => changeZoom(ZOOM_STEP));
+  document.getElementById('btn-zoom-out').addEventListener('click', () => changeZoom(-ZOOM_STEP));
+  document.getElementById('btn-zoom-reset').addEventListener('click', () => { zoomLevel = 0.47; applyZoom(); });
+
+  const viewport = document.getElementById('map-viewport');
+
+  /* Drag to pan */
+  let isDragging = false, startX, startY, scrollLeft, scrollTop;
+  viewport.addEventListener('mousedown', e => {
+    if (e.target.closest('.cam-btn')) return;
+    isDragging = true;
+    startX = e.pageX - viewport.offsetLeft;
+    startY = e.pageY - viewport.offsetTop;
+    scrollLeft = viewport.scrollLeft;
+    scrollTop  = viewport.scrollTop;
+    viewport.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mouseup', () => { isDragging = false; viewport.style.cursor = 'grab'; });
+  viewport.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    e.preventDefault();
+    viewport.scrollLeft = scrollLeft - (e.pageX - viewport.offsetLeft - startX);
+    viewport.scrollTop  = scrollTop  - (e.pageY - viewport.offsetTop  - startY);
+  });
+
+  const fpImg = document.getElementById('fp-img');
+  fpImg.addEventListener('load', () => { applyZoom(); placeMarkers(); });
+  if (fpImg.complete && fpImg.naturalWidth > 0) { applyZoom(); placeMarkers(); }
+}
+
+function changeZoom(delta) {
+  zoomLevel = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((zoomLevel + delta) * 10) / 10));
+  applyZoom();
+}
+
+function applyZoom() {
+  const inner = document.getElementById('map-inner');
+  const fpImg = document.getElementById('fp-img');
+  const label = document.getElementById('zoom-label');
+  if (!inner || !fpImg) return;
+
+  const naturalW = fpImg.naturalWidth  || fpImg.offsetWidth  || 1200;
+  const naturalH = fpImg.naturalHeight || fpImg.offsetHeight || 900;
+
+  const w = Math.round(naturalW * zoomLevel);
+  const h = Math.round(naturalH * zoomLevel);
+
+  fpImg.style.width  = w + 'px';
+  fpImg.style.height = h + 'px';
+  inner.style.width  = w + 'px';
+  inner.style.height = h + 'px';
+
+  if (label) label.textContent = Math.round(zoomLevel * 100) + '%';
+
+  placeMarkers();
+}
+
+function placeMarkers() {
+  const inner = document.getElementById('map-inner');
+  if (!inner) return;
+  inner.querySelectorAll('.cam-marker').forEach(e => e.remove());
+
+  activeFloor.cameras.forEach(cam => {
+    const marker = document.createElement('div');
+    marker.className = 'cam-marker';
+    marker.style.left = cam.x + '%';
+    marker.style.top  = cam.y + '%';
+    marker.innerHTML = `<button class="cam-btn" title="${cam.ip} — ${cam.loc}">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <rect x="1" y="4" width="9" height="7" rx="1.5" stroke="white" stroke-width="1.4"/>
+    <polygon points="10,5.5 15,3 15,12 10,9.5" fill="white"/>
+    <circle cx="5.5" cy="7.5" r="1.8" fill="white" opacity="0.3"/>
+    <circle cx="5.5" cy="7.5" r="0.9" fill="white"/>
+  </svg>
+</button>`;
+    marker.querySelector('button').addEventListener('click', () => openModal(cam));
+    inner.appendChild(marker);
+  });
+}
+
+function openModal(cam) {
+  document.getElementById('modal-ip').textContent       = cam.ip;
+  document.getElementById('modal-building').textContent = activeBuilding.name;
+  document.getElementById('modal-floor').textContent    = activeFloor.name;
+  /*document.getElementById('modal-loc').textContent      = cam.loc;*/
+  document.getElementById('modal-room').textContent     = cam.room;
+  document.getElementById('modal-type').textContent     = cam.type;
+
+  const photoBox = document.getElementById('modal-photo');
+  if (cam.photo) {
+    photoBox.innerHTML = `
+      <img class="snap" src="${cam.photo}" alt="Foto ${cam.ip}"
+           onerror="this.parentElement.innerHTML=noPhotoHTML()" />
+      <span class="cam-label-badge">${cam.ip}</span>`;
+      // klik foto buka lightbox
+photoBox.querySelector('img.snap')?.addEventListener('click', () => {
+  document.getElementById('lightbox-img').src = cam.photo;
+  document.getElementById('lightbox').classList.add('open');
+});
+photoBox.style.cursor = 'zoom-in';
+  } else {
+    photoBox.innerHTML = noPhotoHTML();
+  }
+  overlay.classList.add('open');
+}
+
+document.getElementById('modal-close-btn').addEventListener('click', () => overlay.classList.remove('open'));
+overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+
+const lightbox = document.getElementById('lightbox');
+if (lightbox) {
+  lightbox.addEventListener('click', () => lightbox.classList.remove('open'));
+}
+
+activeBuilding = buildings.find(b => b.id === 'gedung-arts');
+activeFloor    = activeBuilding.floors.find(f => f.id === 'arts-lt1');
+zoomLevel      = 0.47;
+buildSidebar();
+renderFloor();
+</script>
+
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" src="" alt="" />
+</div>
+
+</body>
+</html>
