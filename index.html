@@ -137,7 +137,6 @@
     position: relative;
   }
   .map-viewport:active { cursor: grabbing; }
-  .map-viewport.no-drag { cursor: default; }
 
   /* The inner container scales with zoom */
   .map-inner {
@@ -156,18 +155,20 @@
     transform: translate(-50%, -50%);
     z-index: 10;
   }
-  .cam-btn {
-    display: flex; align-items: center; gap: 4px;
-    background: #E24B4A; color: white;
-    border: none; border-radius: 4px;
-    padding: 3px 8px; font-size: 11px; font-weight: 700;
-    cursor: pointer; white-space: nowrap;
-    transition: background 0.15s, transform 0.1s;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  .cam-icon-wrap {
+    display: inline-flex;
+    transition: transform 0.05s linear;
   }
-  .cam-btn:hover { background: #A32D2D; transform: scale(1.07); }
-  .cam-btn:active { transform: scale(0.97); }
-  
+  .cam-btn {
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; padding: 0;
+    cursor: pointer;
+    transition: transform 0.1s, filter 0.15s;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+  }
+  .cam-btn:hover { transform: scale(1.18); }
+  .cam-btn:active { transform: scale(0.95); }
+
   /* ── Empty state ── */
   .empty-state {
     flex: 1; display: flex; flex-direction: column;
@@ -252,8 +253,11 @@
     <span class="topbar-title">CCTV Monitor</span>
     <span class="topbar-sub">Floor Plan View</span>
   </div>
-  <div class="topbar-right" id="topbar-info"></div>
+  <div class="topbar-right" style="display:flex; align-items:center;">
+    <span id="topbar-info"></span>
+  </div>
 </div>
+
 
 <div class="main">
   <div class="sidebar">
@@ -1043,18 +1047,22 @@ function placeMarkers() {
   inner.querySelectorAll('.cam-marker').forEach(e => e.remove());
 
   activeFloor.cameras.forEach(cam => {
+    if (cam.rotation === undefined) cam.rotation = 0;
     const marker = document.createElement('div');
     marker.className = 'cam-marker';
     marker.style.left = cam.x + '%';
     marker.style.top  = cam.y + '%';
     marker.innerHTML = `<button class="cam-btn" title="${cam.ip} — ${cam.loc}">
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <rect x="1" y="4" width="9" height="7" rx="1.5" stroke="white" stroke-width="1.4"/>
-    <polygon points="10,5.5 15,3 15,12 10,9.5" fill="white"/>
-    <circle cx="5.5" cy="7.5" r="1.8" fill="white" opacity="0.3"/>
-    <circle cx="5.5" cy="7.5" r="0.9" fill="white"/>
+  <span class="cam-icon-wrap" style="transform: rotate(${cam.rotation || 0}deg)">
+  <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
+    <rect x="1" y="4" width="9" height="7" rx="1.5" stroke="#E24B4A" stroke-width="1.6" fill="white"/>
+    <polygon points="10,5.5 15,3 15,12 10,9.5" fill="#E24B4A"/>
+    <circle cx="5.5" cy="7.5" r="1.8" fill="#E24B4A" opacity="0.35"/>
+    <circle cx="5.5" cy="7.5" r="0.9" fill="#E24B4A"/>
   </svg>
+  </span>
 </button>`;
+
     marker.querySelector('button').addEventListener('click', () => openModal(cam));
     inner.appendChild(marker);
   });
