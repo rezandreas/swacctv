@@ -152,6 +152,7 @@
 
   .cam-marker {
     position: absolute;
+    width: 34px; height: 34px;
     transform: translate(-50%, -50%);
     z-index: 10;
   }
@@ -159,16 +160,24 @@
     display: inline-flex;
     transition: transform 0.05s linear;
   }
+  /* cam-visual groups the beam + icon so ONE rotation moves both together */
+  .cam-visual {
+    position: absolute; top: 50%; left: 50%; width: 0; height: 0;
+    transform-origin: 0 0;
+  }
+  .cam-beam { position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none; }
+  .cam-beam svg { position: absolute; left: 0; top: -65px; pointer-events: none; display: block; }
   .cam-btn {
+    position: absolute; top: 0; left: 0;
     display: flex; align-items: center; justify-content: center;
     background: transparent; border: none; padding: 0;
     cursor: pointer;
+    transform: translate(-50%, -50%);
     transition: transform 0.1s, filter 0.15s;
     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
   }
-  /*.cam-btn:hover { transform: scale(1.18); }
-  .cam-btn:active { transform: scale(0.95); }*/
-
+  .cam-btn:hover { transform: translate(-50%, -50%) scale(1.18); }
+  .cam-btn:active { transform: translate(-50%, -50%) scale(0.95); }
 
   /* ── Empty state ── */
   .empty-state {
@@ -311,37 +320,37 @@ const buildings = [
         id: 'arts-lt1', name: 'Lantai 1',
         floorplan: 'assets/floor plan/ac-l1.png',
         cameras: [
-  { ip:'192.168.12.1', x:41.4, y:88.9, room:'AC-119', type:'Dome Indoor', photo:'assets/foto/arts/ac-119.jpg', rotation:210 },
-  { ip:'192.168.12.2', x:83, y:54.9, room:'AC-1 Stair', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 stair.jpg', rotation:180 },
-  { ip:'192.168.12.3', x:44, y:49, room:'AC-1 Toilet', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 toilet.jpg', rotation:0 },
-  { ip:'192.168.12.4', x:6.7, y:88.9, room:'AC-120', type:'Dome Indoor', photo:'assets/foto/arts/ac-120.jpg', rotation:330 },
-  { ip:'192.168.12.5', x:91.1, y:54.4, room:'AC-1 Shop', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 shop.jpg', rotation:225 },
-  { ip:'192.168.12.6', x:46, y:45, room:'AC-1 Gallery', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 gallery.jpg', rotation:0 },
-  { ip:'192.168.12.7', x:57.4, y:65.3, room:'AC-1 Dance', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 dance.jpg', rotation:330 },
-  { ip:'192.168.12.8', x:20.7, y:16, room:'AC-1 Nurse', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 nurse.jpg', rotation:195 },
-  { ip:'192.168.12.9', x:52, y:89.3, room:'AC-1 Drama', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 drama.jpg', rotation:315 },
-  { ip:'192.168.12.10', x:71.7, y:18.7, room:'AC-1 Lotus Lounge', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 lotus lounge.jpg', rotation:45 },
-  { ip:'192.168.12.11', x:40.9, y:44.3, room:'AC-1 TD Ctrl', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 td ctrl.jpg', rotation:180 },
-  { ip:'192.168.12.12', x:11.7, y:59.3, room:'AC-1 TD South', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 td south.jpg', rotation:330 },
-  { ip:'192.168.12.13', x:11.5, y:27, room:'AC-1 TD North', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 td north.jpg', rotation:30 },
-  { ip:'192.168.12.14', x:80, y:35, room:'AC-1 Entrance', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 lobby.jpg', rotation:0 },
-  { ip:'192.168.12.15', x:79.8, y:74.8, room:'AC-1 Bamboo C', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 bamboo court.jpg', rotation:180 },
-  { ip:'192.168.12.16', x:19, y:18, room:'AC-1 Hallway', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 hallway.jpg', rotation:0 },
-  { ip:'192.168.12.17', x:65.2, y:25.8, room:'AC-1 to ZH', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 to zh.jpg', rotation:210 },
-  { ip:'192.168.12.18', x:94, y:20, room:'AC-1 Front A', type:'Outdoor', photo:'assets/foto/arts/cam_19_10.jpg ', rotation:0 },
-  { ip:'192.168.12.19', x:94, y:82, room:'AC-1 Front B', type:'Outdoor', photo:'assets/foto/arts/arts-1 front b.jpg', rotation:0 },
-  { ip:'192.168.12.20', x:65.1, y:98.3, room:'AC-1 to Koi', type:'Outdoor', photo:'assets/foto/arts/ac-1 to koi.jpg', rotation:165 },
-  { ip:'192.168.12.21', x:6, y:4, room:'AC-1 ZHGarden', type:'Outdoor', photo:'assets/foto/arts/ac-1 zh garden.jpg', rotation:0 },
-  { ip:'192.168.12.33', x:26.9, y:69.3, room:'AC-1 music lobby 1', type:'Indoor', photo:'assets/foto/arts/ac-1 lobby music 1.png', rotation:180 },
-  { ip:'192.168.12.34', x:45, y:40, room:'AC-1 ATM', type:'Indoor', photo:'assets/foto/arts/ac-1 atm.png', rotation:0 },
-  { ip:'192.168.12.35', x:39.6, y:19.3, room:'AC-1 it helpdesk', type:'Indoor', photo:'assets/foto/arts/ac-1 it helpdesk.png', rotation:285 },
-  { ip:'192.168.12.36', x:6.1, y:18.2, room:'AC-td exit b', type:'Outdoor', photo:'assets/foto/arts/ac-1 td exit b.png ', rotation:0 },
-  { ip:'192.168.12.37', x:6.2, y:70.9, room:'AC-td makeup', type:'Outdoor', photo:'assets/foto/arts/ac-1 td makeup room.png', rotation:315 },
-  { ip:'192.168.12.38', x:29.3, y:69.7, room:'AC-1 music lobby 2', type:'Outdoor', photo:'assets/foto/arts/ac-1 lobby music 2.png', rotation:0 },
-  { ip:'192.168.12.39', x:5.9, y:24.2, room:'Trini Dewi BkStage L', type:'Indoor', photo:'assets/foto/arts/ac-1 dt backstage left.png', rotation:60 },
-  { ip:'192.168.12.49', x:63, y:89, room:'AC-1 Bamboo C 2', type:'Outdoor', photo:'assets/foto/arts/cam_19_10.jpg ', rotation:330 },
-  { ip:'192.168.12.50', x:82.6, y:72.1, room:'AC-1 Bamboo Kitchen', type:'Outdoor', photo:'assets/foto/arts/ac-1 kitchen.jpg', rotation:0 },
-]
+          { ip:'192.168.12.1', x:41.4, y:88.9, room:'AC-119', type:'Dome Indoor', photo:'assets/foto/arts/ac-119.jpg', rotation:210 },
+          { ip:'192.168.12.2', x:83, y:54.9, room:'AC-1 Stair', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 stair.jpg', rotation:180 },
+          { ip:'192.168.12.3', x:44, y:49, room:'AC-1 Toilet', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 toilet.jpg', rotation:0 },
+          { ip:'192.168.12.4', x:6.7, y:88.9, room:'AC-120', type:'Dome Indoor', photo:'assets/foto/arts/ac-120.jpg', rotation:330 },
+          { ip:'192.168.12.5', x:91.1, y:54.4, room:'AC-1 Shop', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 shop.jpg', rotation:225 },
+          { ip:'192.168.12.6', x:46, y:45, room:'AC-1 Gallery', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 gallery.jpg', rotation:0 },
+          { ip:'192.168.12.7', x:57.4, y:65.3, room:'AC-1 Dance', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 dance.jpg', rotation:330 },
+          { ip:'192.168.12.8', x:20.7, y:16, room:'AC-1 Nurse', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 nurse.jpg', rotation:195 },
+          { ip:'192.168.12.9', x:52, y:89.3, room:'AC-1 Drama', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 drama.jpg', rotation:315 },
+          { ip:'192.168.12.10', x:71.7, y:18.7, room:'AC-1 Lotus Lounge', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 lotus lounge.jpg', rotation:45 },
+          { ip:'192.168.12.11', x:40.9, y:44.3, room:'AC-1 TD Ctrl', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 td ctrl.jpg', rotation:180 },
+          { ip:'192.168.12.12', x:11.7, y:59.3, room:'AC-1 TD South', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 td south.jpg', rotation:330 },
+          { ip:'192.168.12.13', x:11.5, y:27, room:'AC-1 TD North', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 td north.jpg', rotation:30 },
+          { ip:'192.168.12.14', x:80, y:35, room:'AC-1 Entrance', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 lobby.jpg', rotation:0 },
+          { ip:'192.168.12.15', x:79.8, y:74.8, room:'AC-1 Bamboo C', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 bamboo court.jpg', rotation:180 },
+          { ip:'192.168.12.16', x:19, y:18, room:'AC-1 Hallway', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 hallway.jpg', rotation:0 },
+          { ip:'192.168.12.17', x:65.2, y:25.8, room:'AC-1 to ZH', type:'Dome Indoor', photo:'assets/foto/arts/ac-1 to zh.jpg', rotation:210 },
+          { ip:'192.168.12.18', x:94, y:20, room:'AC-1 Front A', type:'Outdoor', photo:'assets/foto/arts/cam_19_10.jpg ', rotation:0 },
+          { ip:'192.168.12.19', x:94, y:82, room:'AC-1 Front B', type:'Outdoor', photo:'assets/foto/arts/arts-1 front b.jpg', rotation:0 },
+          { ip:'192.168.12.20', x:65.1, y:98.3, room:'AC-1 to Koi', type:'Outdoor', photo:'assets/foto/arts/ac-1 to koi.jpg', rotation:165 },
+          { ip:'192.168.12.21', x:6, y:4, room:'AC-1 ZHGarden', type:'Outdoor', photo:'assets/foto/arts/ac-1 zh garden.jpg', rotation:0 },
+          { ip:'192.168.12.33', x:26.9, y:69.3, room:'AC-1 music lobby 1', type:'Indoor', photo:'assets/foto/arts/ac-1 lobby music 1.png', rotation:180 },
+          { ip:'192.168.12.34', x:45, y:40, room:'AC-1 ATM', type:'Indoor', photo:'assets/foto/arts/ac-1 atm.png', rotation:0 },
+          { ip:'192.168.12.35', x:39.6, y:19.3, room:'AC-1 it helpdesk', type:'Indoor', photo:'assets/foto/arts/ac-1 it helpdesk.png', rotation:285 },
+          { ip:'192.168.12.36', x:6.1, y:18.2, room:'AC-td exit b', type:'Outdoor', photo:'assets/foto/arts/ac-1 td exit b.png ', rotation:0 },
+          { ip:'192.168.12.37', x:6.2, y:70.9, room:'AC-td makeup', type:'Outdoor', photo:'assets/foto/arts/ac-1 td makeup room.png', rotation:315 },
+          { ip:'192.168.12.38', x:29.3, y:69.7, room:'AC-1 music lobby 2', type:'Outdoor', photo:'assets/foto/arts/ac-1 lobby music 2.png', rotation:0 },
+          { ip:'192.168.12.39', x:5.9, y:24.2, room:'Trini Dewi BkStage L', type:'Indoor', photo:'assets/foto/arts/ac-1 dt backstage left.png', rotation:60 },
+          { ip:'192.168.12.49', x:63, y:89, room:'AC-1 Bamboo C 2', type:'Outdoor', photo:'assets/foto/arts/cam_19_10.jpg ', rotation:330 },
+          { ip:'192.168.12.50', x:82.6, y:72.1, room:'AC-1 Bamboo Kitchen', type:'Outdoor', photo:'assets/foto/arts/ac-1 kitchen.jpg', rotation:0 },
+        ]
       },
       {
         id: 'arts-lt2', name: 'Lantai 2',
@@ -394,7 +403,7 @@ const buildings = [
           { ip:'192.168.1.1', x:664, y:12, room:'', loc:'',  type:'Indoor', photo:''},
           { ip:'192.168.15.42', x:88, y:19, room:'Basement Sport C', loc:'',  type:'Outdoor', photo:''},
           { ip:'192.168.15.48', x:95, y:54, room:'Basement Exit', loc:'',  type:'Outdoor', photo:'assets/foto/basement/basement exit.jpg'},
-          { ip:'192.168.15.8', x:62, y:85, room:'SWA Exit', loc:'',  type:'Outdoor', photo:'assets/foto/basement/swa-exit gate.jpg'},
+          { ip:'192.168.15.8', x:62, y:85, room:'SWA Exit', loc:'',  type:'Outdoor', photo:''},
         ]
       },
       
@@ -1047,27 +1056,44 @@ function placeMarkers() {
   if (!inner) return;
   inner.querySelectorAll('.cam-marker').forEach(e => e.remove());
 
-  activeFloor.cameras.forEach(cam => {
+  activeFloor.cameras.forEach((cam, idx) => {
     if (cam.rotation === undefined) cam.rotation = 0;
     const marker = document.createElement('div');
     marker.className = 'cam-marker';
     marker.style.left = cam.x + '%';
     marker.style.top  = cam.y + '%';
-    marker.innerHTML = `<button class="cam-btn" title="${cam.ip} — ${cam.loc}">
-  <span class="cam-icon-wrap" style="transform: rotate(${cam.rotation || 0}deg)">
-  <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
-    <rect x="1" y="4" width="9" height="7" rx="1.5" stroke="#E24B4A" stroke-width="1.6" fill="white"/>
-    <polygon points="10,5.5 15,3 15,12 10,9.5" fill="#E24B4A"/>
-    <circle cx="5.5" cy="7.5" r="1.8" fill="#E24B4A" opacity="0.35"/>
-    <circle cx="5.5" cy="7.5" r="0.9" fill="#E24B4A"/>
-  </svg>
-  </span>
-</button>`;
+    const gradId = 'beam-grad-' + idx;
+
+    /* cam-visual = SATU wrapper yang membungkus beam + icon,
+       jadi satu rotate() menggerakkan keduanya bersamaan */
+    marker.innerHTML = `<div class="cam-visual" style="transform: rotate(${cam.rotation}deg)">
+  <div class="cam-beam">
+    <svg width="130" height="130" viewBox="0 0 130 130" style="position:absolute; left:0; top:-65px;">
+      <defs>
+        <radialGradient id="${gradId}" gradientUnits="userSpaceOnUse" cx="0" cy="65" r="115">
+          <stop offset="0%" stop-color="#FFE9A8" stop-opacity="0.75"/>
+          <stop offset="55%" stop-color="#FFE9A8" stop-opacity="0.32"/>
+          <stop offset="100%" stop-color="#FFE9A8" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <path d="M0,65 L93,6 A115,115 0 0,1 93,124 Z" fill="url(#${gradId})"/>
+    </svg>
+  </div>
+  <button class="cam-btn" title="${cam.ip} — ${cam.loc}">
+    <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="4" width="9" height="7" rx="1.5" stroke="#E24B4A" stroke-width="1.6" fill="white"/>
+      <polygon points="10,5.5 15,3 15,12 10,9.5" fill="#E24B4A"/>
+      <circle cx="5.5" cy="7.5" r="1.8" fill="#E24B4A" opacity="0.35"/>
+      <circle cx="5.5" cy="7.5" r="0.9" fill="#E24B4A"/>
+    </svg>
+  </button>
+</div>`;
 
     marker.querySelector('button').addEventListener('click', () => openModal(cam));
     inner.appendChild(marker);
   });
 }
+
 
 function openModal(cam) {
   document.getElementById('modal-ip').textContent       = cam.ip;
